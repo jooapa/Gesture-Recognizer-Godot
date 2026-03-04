@@ -14,14 +14,16 @@
 ### Classify Gesture
   When you have been draw a gesture, you can classify for three differents ways:
 
-  - Call to classify() fuction:
-    ```
+  - Call to classify() or classify_thread() fuction:
+    ```nim
     func test():
       Gesture.classify()
+      # Or
+      Gesture.classify_thread()
     ```
     
   - Make true the property Classify Gesture:
-    ```
+    ```nim
     func test():
       Gesture.ClassifyGesture = true
     ```
@@ -35,7 +37,7 @@
 
   ![Create gesture from inspector.](/pictures/2.3.1CreateGesture.png)
 
-  Run the scene and draw youy gesture, when you end your gesture, you have to classify with the same ways the Classify Gesture or click on create button.
+  Run the scene and draw your gesture, when you end your gesture, you have to classify with the same ways the Classify Gesture or click on create button.
 
   ![Classify buttom from run game.](/pictures/2.3.2CreateButton.png)
 
@@ -53,6 +55,7 @@
   - **Smooth**: Smoothing of the line stroke.
   - **Line Color**: Color that the line will have.
   - **Width Curve**: Makes there are different thicknesses along the line.
+  - **Line Shader**: User can assign a custom shader to the line, if this property is null, the line will use the default shader. [example shader](examples/assets/line.gdshader)
 
 ### Outline
   - **Outline**: Add a outline at the line.
@@ -111,4 +114,4 @@ You can report bugs and request features [Here](https://docs.google.com/forms/d/
 
 
 
-[BSD License](https://github.com/Little-Fish-hub/Gesture-Recognizer-Godot/blob/main/LICENSE.md)
+[BSD License](./LICENSE.md)
