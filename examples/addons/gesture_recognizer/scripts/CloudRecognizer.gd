@@ -42,7 +42,7 @@ func _process(delta: float) -> void:
 				name = dir.get_next()
 		customDirCheck = true
 
-func classify(candidate : Gest):
+func classify(candidate : Gest, isThreaded : bool) -> StringName:
 	var minDistance : float = INF
 	var gestureClass : StringName = "";
 	for template : Gest in gestureSet:
@@ -52,7 +52,8 @@ func classify(candidate : Gest):
 			distCloud = dist
 			gestureClass = template.gestureName
 	prints("recognized gesture:", gestureClass)
-	classified_gesture.emit(gestureClass)
+	if not isThreaded:
+		classified_gesture.emit(gestureClass)
 	return gestureClass
 
 func dist():

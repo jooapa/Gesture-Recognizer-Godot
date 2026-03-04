@@ -85,6 +85,7 @@ lineColor = Color(0.867792, 0.0231687, 3.85046e-07, 1)
 widthCurve = SubResource("Curve_nn80n")
 outlineWidth = 10
 outlineColor = Color(0, 0, 0.988235, 1)
+createGesture = true
 customDir = true
 customDirUI = "oo"
 buttonForClassify = true

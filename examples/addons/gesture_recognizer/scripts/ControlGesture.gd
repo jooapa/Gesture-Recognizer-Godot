@@ -1,9 +1,11 @@
 extends Area2D
 class_name Gesture
 
+@export var disabled : bool = false
+
 @export_category("Line")
 
-#Variables de linea
+## Line variables
 var line = null
 @export var capMode : int = 2
 @export var minLengthLine : int = 15
@@ -11,6 +13,7 @@ var line = null
 @export var smooth : int = 3;
 @export var lineColor : Color = Color.ALICE_BLUE
 @export var widthCurve : Curve = null
+@export var lineShader : ShaderMaterial = null
 
 @export_subgroup("Outline")
 var outline = null
@@ -64,22 +67,96 @@ var pointsDissapear
 #error
 var error : bool = false
 
-
-
 func classify():
 	set_gesture()
 	reset_gesture()
 	if createGesture: # and line != null:
 		create.visible = true
+		if pointsArray != null and not pointsArray.is_empty():
+			resize_points(pointsArray)
+			normalize_points(pointsArray)
+			integers_points(pointsNorm)
+			LUT_construct()
 	else:
-		if !LUT.is_empty():
+		if pointsArray != null and not pointsArray.is_empty():
+			# If NOT threaded, we need to process points right here synchronously before classifying
+			resize_points(pointsArray)
+			normalize_points(pointsArray)
 			if !error:
-				nameGest = CloudRecognizer.classify(gestureResource)
+				integers_points(pointsNorm)
+				LUT_construct()
+			
+			if !LUT.is_empty() and !error:
+				nameGest = CloudRecognizer.classify(gestureResource, false)
 				var distCloud =  CloudRecognizer.dist()
 				gesture_name.emit(nameGest, distCloud)
 		reset_gesture_data()
 	pass
 
+func classify_thread():
+	# 1. Main Thread: Extract data from Nodes (Must be on Main Thread)
+	if get_node("Line").get_child_count() > 0:
+		var children = get_node("Line").get_children()
+		for i in range(children.size()):
+			pointsArray = append_vec3_array(children[i], i)
+			
+	reset_gesture()
+	
+	if createGesture:
+		create.visible = true
+		if pointsArray != null and not pointsArray.is_empty():
+			# If creating a gesture, we still need to process the points synchronously
+			resize_points(pointsArray)
+			normalize_points(pointsArray)
+			integers_points(pointsNorm)
+			LUT_construct()
+	else:
+		# 2. Dispatch heavy math to the worker thread
+		if pointsArray != null and not pointsArray.is_empty():
+			# Pass a copy of the points so the main thread doesn't accidentally modify them
+			WorkerThreadPool.add_task(_run_cloud_recognition_threaded.bind(pointsArray.duplicate(true)))
+		else:
+			reset_gesture_data()
+
+# Inside your Worker Thread function
+func _run_cloud_recognition_threaded(raw_points: Array):
+	# 1. Do the heavy lifting (Data preparation)
+	resize_points(raw_points)
+	normalize_points(pointsArray)
+	if error:
+		call_deferred("_finalize_classification", "", 0.0)
+		return
+		
+	integers_points(pointsNorm)
+	LUT_construct()
+
+	if LUT.is_empty() or error:
+		call_deferred("_finalize_classification", "", 0.0)
+		return
+
+	# 2. Do the math (No signals inside here!)
+	var result_name = CloudRecognizer.classify(gestureResource, true)
+	var result_dist = CloudRecognizer.dist()
+	
+	# 3. Return to Main Thread to emit the signal safely
+	call_deferred("_finalize_classification", result_name, result_dist)
+
+# Inside ControlGesture.gd (The script calling the thread)
+# This runs on the MAIN THREAD after the math is done
+func _finalize_classification(nameGest, distCloud):
+	# 1. Check if the node actually exists before touching it
+	var cloud_node = get_node_or_null("/root/CloudRecognizer") # Use your actual path
+	
+	if cloud_node:
+		cloud_node.classified_gesture.emit(nameGest)
+	else:
+		# If it's an Autoload (Singleton), just use the name directly:
+		CloudRecognizer.classified_gesture.emit(nameGest)
+	
+	# 2. Emit your local signal
+	gesture_name.emit(nameGest, distCloud)
+	reset_gesture_data()
+		
 func _ready():
 	
 	if customDir:
@@ -123,6 +200,7 @@ func _ready():
 	var lineNode = Node.new()
 	lineNode.set_name("Line")
 	add_child(lineNode)
+
 	pass
 
 func _process(delta):
@@ -137,7 +215,7 @@ func _process(delta):
 		if Input.is_action_just_released(customButtomUI):
 			stop_drawing()
 	
-	if onDrawing: # and ( != get_global_mouse_position()):
+	if onDrawing and is_instance_valid(line): # and ( != get_global_mouse_position()):
 		var a : Array = line.get_points();
 		if !a.is_empty():
 			if a.back() != get_global_mouse_position():
@@ -153,27 +231,27 @@ func _process(delta):
 		classify()
 
 func _on_input_event(viewport, event, shape_idx):
-	if touch:
-		if event is InputEventScreenTouch and event.pressed:
+	if disabled:
+		return
+	
+	if (event is InputEventScreenTouch or (event is InputEventMouseButton and event.button_index == 1)):
+		if event.pressed:
 			drawing()
-		if event is InputEventScreenTouch and !event.pressed:
+		elif !event.pressed:
 			stop_drawing()
-	
-	
-	elif !customButton:
-		if event is InputEventMouseButton and event.pressed and event.button_index == 1:
-			drawing()
-		if event is InputEventMouseButton and !event.pressed and event.button_index == 1:
-			stop_drawing()
-	
-	pass
 
+# Update the drawing logic to respect the disabled flag
 func drawing():
+	if disabled:
+		return
 	on_draw_enter.emit()
 	error = false
-	
 	onDrawing = true
 	line = Line2D.new()
+	# usings the line texture stretch so any shader UV's will work correctly
+	line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+	if lineShader != null:
+		line.material = lineShader
 	line.set_default_color(lineColor)
 	line.set_begin_cap_mode(capMode)
 	line.set_end_cap_mode(capMode)
@@ -183,11 +261,14 @@ func drawing():
 		line.set_curve(widthCurve)
 	if Outline:
 		outline = Line2D.new()
+		outline.texture_mode = Line2D.LINE_TEXTURE_STRETCH
 		outline.set_default_color(outlineColor)
 		outline.set_begin_cap_mode(capMode)
 		outline.set_end_cap_mode(capMode)
 		outline.set_antialiased(true)
 		outline.set_width(lineWidth + outlineWidth)
+		if lineShader != null:
+			outline.material = lineShader
 		if widthCurve != null:
 			outline.set_curve(widthCurve)
 		if !lineCoverLine:
@@ -195,28 +276,27 @@ func drawing():
 		else:
 			get_node("Line").add_child(outline)
 	get_node("Line").add_child(line)
-	
 	pass
 
 func stop_drawing():
-	onDrawing = false;
+	if disabled:
+		return
+	onDrawing = false
 	on_draw_exit.emit()
-	
 	if line != null:
-		var smoothedPoints = smooth_points(line.get_points());
+		var smoothedPoints = smooth_points(line.get_points())
 		line.set_points(smoothedPoints)
-		var length : float = 0;
+		var length : float = 0
 		for i in smoothedPoints.size():
 			if i != 0:
 				length += distance(smoothedPoints[i - 1], smoothedPoints[i])
 		if Outline:
 			outline.set_points(smoothedPoints)
-			
 			if length < minLengthLine:
 				outline.queue_free()
 			outline = null
 		if length < minLengthLine:
-				line.queue_free()
+			line.queue_free()
 	line = null
 	pass
 
@@ -243,14 +323,12 @@ func smooth_points(points):
 	
 
 func set_gesture():
+	# Now only extracts points, rest is handled in worker thread 
 	if get_node("Line").get_child_count() > 0:
 		var children = get_node("Line").get_children()
 		for i in range(children.size()):
 			pointsArray = append_vec3_array(children[i], i)
-		resize_points(pointsArray)
-		normalize_points(pointsArray)
-		integers_points(pointsNorm)
-		LUT_construct()
+
 		
 
 
@@ -391,6 +469,7 @@ func reset_gesture_data():
 		pointsIntegers.clear()
 	if LUT != null:
 		LUT.clear()
+	
 
 func distance(ubi1, ubi2):
 	var dist : float;

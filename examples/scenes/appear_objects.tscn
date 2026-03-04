@@ -1,8 +1,9 @@
-[gd_scene load_steps=14 format=3 uid="uid://bs47pheanp4e3"]
+[gd_scene load_steps=18 format=3 uid="uid://bs47pheanp4e3"]
 
 [ext_resource type="Script" path="res://scripts/appear_objects.gd" id="1_pgfte"]
 [ext_resource type="Script" path="res://addons/gesture_recognizer/scripts/ControlGesture.gd" id="1_y42jb"]
 [ext_resource type="Texture2D" uid="uid://b5sy04vdq6q0t" path="res://assets/watercolor-5062356_1920.jpg" id="3_q5v1u"]
+[ext_resource type="Shader" path="res://assets/line.gdshader" id="4_ad2on"]
 [ext_resource type="Texture2D" uid="uid://c60dqqxan2i05" path="res://assets/sun.png" id="4_fbs2e"]
 [ext_resource type="Script" path="res://scripts/sun.gd" id="5_rty71"]
 [ext_resource type="Texture2D" uid="uid://bec2gx83qa22w" path="res://assets/8083d36269b0492d2b91b28abf5b3533.png" id="6_j84f5"]
@@ -24,6 +25,17 @@ material = SubResource("StandardMaterial3D_11hk6")
 [sub_resource type="Curve" id="Curve_nn80n"]
 _data = [Vector2(0.169355, 0.406593), 0.0, 0.0, 0, 0, Vector2(0.487903, 0.626374), 0.0, 0.0, 0, 0, Vector2(0.959677, 0.351648), 0.0, 0.0, 0, 0]
 point_count = 3
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_lq0i0"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_hdwws"]
+noise = SubResource("FastNoiseLite_lq0i0")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ochl6"]
+shader = ExtResource("4_ad2on")
+shader_parameter/progress = 0.3
+shader_parameter/scroll_speed = 0.5
+shader_parameter/noise_tex = SubResource("NoiseTexture2D_hdwws")
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_7tm1w"]
 size = Vector2(1173, 684)
@@ -113,7 +125,9 @@ script = ExtResource("1_y42jb")
 lineWidth = 16
 lineColor = Color(0.950113, 0.716607, 0.884093, 1)
 widthCurve = SubResource("Curve_nn80n")
+lineShader = SubResource("ShaderMaterial_ochl6")
 outlineWidth = 10
+createGesture = true
 buttonForClassify = true
 buttonForClassifyUI = "ui_accept"
 
