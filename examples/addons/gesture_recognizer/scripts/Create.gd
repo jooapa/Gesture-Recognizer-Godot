@@ -82,7 +82,6 @@ func save_resource():
 	
 	ResourceLoader.load(savePath + gestureFilename + ".tres")
 	get_parent().get_parent().reset_gesture_data()
-	print("Gesture saved as: " + gestureFilename)
 
 func _on_button_button_up() -> void:
 	save_gesture()
