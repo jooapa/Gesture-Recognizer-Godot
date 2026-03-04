@@ -43,7 +43,8 @@ var create
 
 #Opciones
 @export_subgroup("Settings")
-@export var touch : bool = false
+enum InputMode { TOUCH, MOUSE, BOTH }
+@export var input_mode : InputMode = InputMode.BOTH
 @export var customButton : bool = false
 @export var customButtomUI : String
 var earlyAbandoning : bool = true
@@ -170,7 +171,7 @@ func _ready():
 	LUT.clear()
 	gestureResource = Gest.new()
 	
-	if touch:
+	if input_mode == InputMode.TOUCH:
 		customButton = false
 	
 	CloudRecognizer.earlyAbandoning = earlyAbandoning
@@ -233,11 +234,20 @@ func _process(delta):
 func _on_input_event(viewport, event, shape_idx):
 	if disabled:
 		return
-	
-	if (event is InputEventScreenTouch or (event is InputEventMouseButton and event.button_index == 1)):
-		if event.pressed:
+
+	var allow_touch = input_mode == InputMode.TOUCH or input_mode == InputMode.BOTH
+	var allow_mouse = input_mode == InputMode.MOUSE or input_mode == InputMode.BOTH
+
+	if allow_touch:
+		if event is InputEventScreenTouch and event.pressed:
 			drawing()
-		elif !event.pressed:
+		if event is InputEventScreenTouch and !event.pressed:
+			stop_drawing()
+
+	if allow_mouse and !customButton:
+		if event is InputEventMouseButton and event.pressed and event.button_index == 1:
+			drawing()
+		if event is InputEventMouseButton and !event.pressed and event.button_index == 1:
 			stop_drawing()
 
 # Update the drawing logic to respect the disabled flag
