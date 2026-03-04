@@ -127,7 +127,6 @@ lineColor = Color(0.950113, 0.716607, 0.884093, 1)
 widthCurve = SubResource("Curve_nn80n")
 lineShader = SubResource("ShaderMaterial_ochl6")
 outlineWidth = 10
-createGesture = true
 buttonForClassify = true
 buttonForClassifyUI = "ui_accept"
 
